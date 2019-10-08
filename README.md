@@ -13,7 +13,7 @@ The exam includes 3 tasks to be done: [Calculator](/tasks/Calculator.md), [Pyram
 
 * Author name : Krasikov Maxim
 * Codeship : https://app.codeship.com/projects/1364c3d0-cb07-0137-ca50-0617da1f6401
-
+long
 
 ### How to start?  ###
 * Install [GIT](https://git-scm.com/) and [Maven](https://maven.apache.org)
