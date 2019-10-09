@@ -1,10 +1,14 @@
 package com.tsystems.javaschool.tasks.calculator;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Locale;
+import java.util.*;
 
 public class Calculator {
+
+    private static final String OPERATORS = "+-*/";
+    private static final String DIGITS = "0123456789";
+    private static final String SEPARATOR = ".";
+    private static final String LEFT_BRACKET = "(";
+    private static final String RIGHT_BRACKET = ")";
 
     /**
      * Evaluate statement represented as string.
@@ -15,96 +19,177 @@ public class Calculator {
      * @return string value containing result of evaluation or null if statement is invalid
      */
     public String evaluate(String statement) {
-        if ((statement ==null) || (!validate(statement))) return null;
+        if (!isValidStatement(statement))
+            return null;
 
-        int firstBracketIndex = statement.indexOf("(");
-        while(firstBracketIndex != -1) {
-            statement = bracketsCompress(statement.substring(firstBracketIndex + 1));
-            if(statement == null) return null;
-            firstBracketIndex = statement.indexOf("(");
+        statement = statement.replaceAll("\\s","");
+
+        List<String> tokens = new ArrayList<>();
+
+        int i = 0;
+        String token;
+
+        while (i < statement.length()) {
+            token = "";
+            while ((i < statement.length()) && (isDigit("" + statement.charAt(i)) || isSeparator("" + statement.charAt(i)))) {
+                token += statement.charAt(i);
+                ++i;
+            }
+
+            if (!token.equals(""))
+                tokens.add(token);
+
+            while ((i < statement.length()) && (isOperator("" + statement.charAt(i))
+                    || isLeftBracket("" + statement.charAt(i)) || isRightBracket("" + statement.charAt(i)))) {
+                tokens.add("" + statement.charAt(i));
+                ++i;
+            }
         }
 
-        return calcSimple(statement);
-    }
+        ArrayList<String> result = new ArrayList<>();
+        Stack<String> stack = new Stack<>();
 
-    private boolean validate(String statement) {
-        Character[] ligal = {'0','1','2','3','4','5','6','7','8','9','(',')','.','+','-','*','/'};
-        String[] checkedResult = statement.split("[0123456789()\\-+*/]");
-        return checkedResult.length == 0;
-    }
-
-    private String bracketsCompress(String statement) {
-        int closedBracketIndex = statement.indexOf(")");
-        int newOpenBracketIndex = statement.indexOf("(");
-        if(closedBracketIndex == -1) return null;
-        if((newOpenBracketIndex != -1) && (closedBracketIndex > newOpenBracketIndex)) {
-            statement = bracketsCompress(statement.substring(newOpenBracketIndex + 1));
-        }
-        closedBracketIndex = statement.indexOf(")");
-        if(closedBracketIndex == -1) return null;
-        if(closedBracketIndex != statement.length())
-            return calcSimple(statement.substring(0, closedBracketIndex)) + statement.substring(closedBracketIndex + 1);
-        else
-            return calcSimple(statement.substring(0, closedBracketIndex));
-    }
-
-    private String calcSimple(String statement) {
-        ArrayList<String> operands = new ArrayList<>(Arrays.asList(statement.split("[+\\-/*]")));
-        ArrayList<String> operations = new ArrayList<>(Arrays.asList(statement.split("[0123456789.,]")));
-        operations.removeIf(n -> n.equals(""));
-        operands.removeIf(n -> n.equals(""));
-        if(statement.charAt(0) == '-') {
-            operands.add(0, '-'+operands.get(0));
-            operands.remove(1);
-            operations.remove(0);
-        }
-        //Calculate multiply and division
-        int count = operations.size();
-        int index = 0;
-        for(int i =0; i < count; i++) {
-            if((operations.get(index).equals("/"))||(operations.get(index).equals("*")))
-            {
-                double res = 0;
-                switch (operations.get(index)) {
-                    case "/":
-                            res = Double.parseDouble(operands.get(index))/Double.parseDouble(operands.get(index+1));
-                        break;
-                    case "*":
-                            res = Double.parseDouble(operands.get(index))*Double.parseDouble(operands.get(index+1));
-                        break;
+        for (String t : tokens) {
+            if (isOperator(t)) {
+                while (!stack.empty() && isOperator(stack.peek())) {
+                    if (comparePrecedence(t, stack.peek()) <= 0) {
+                        result.add(stack.pop());
+                        continue;
+                    }
+                    break;
                 }
-                operands.remove(index+1);
-                operands.remove(index);
-                operands.add(index, String.valueOf(res));
-                operations.remove(index);
-            } else index++;
+                stack.push(t);
+            }
+            else if (isLeftBracket(t)) {
+                stack.push(t);
+            }
+            else if (isRightBracket(t)) {
+                while (!stack.empty() && !isLeftBracket(stack.peek()))
+                {
+                    result.add(stack.pop());
+                }
+                stack.pop();
+            }
+            else {
+                result.add(t);
+            }
         }
 
-        //Calculate summarize and subtraction
-        index = 0;
-        count = operations.size();
-        for(int i = 0; i < count; i++) {
-            if((operations.get(index).equals("+"))||(operations.get(index).equals("-")))
-            {
-                double res = 0;
-                switch (operations.get(index)) {
-                    case "+":
-                        res = Double.parseDouble(operands.get(index))+Double.parseDouble(operands.get(index+1));
-                        break;
-                    case "-":
-                        res = Double.parseDouble(operands.get(index))-Double.parseDouble(operands.get(index+1));
-                        break;
-                }
-                operands.remove(index+1);
-                operands.remove(index);
-                operands.add(index, String.valueOf(res));
-                operations.remove(index);
-            } else index++;
+        while (!stack.empty())
+        {
+            result.add(stack.pop());
         }
-        double res = Double.parseDouble(operands.get(0));
-        if (res == (long)res)
-            return String.format(Locale.ENGLISH,"%d", (long)res);
+
+        for (String t : result) {
+            if (!isOperator(t))
+            {
+                stack.push(t);
+            }
             else
-                return  String.format(Locale.ENGLISH,"%.4f", res);
+            {
+                Double d2 = Double.valueOf(stack.pop());
+                Double d1 = Double.valueOf(stack.pop());
+
+                if (t.equals("/") && (d1 % 1 == 0) && (d2 == 0))
+                    return null;
+
+                Double tmp = t.compareTo("+") == 0 ? d1 + d2 : t.compareTo("-") == 0 ? d1 - d2
+                        : t.compareTo("*") == 0 ? d1 * d2 : d1 / d2;
+
+                stack.push(String.valueOf(tmp));
+            }
+        }
+
+        Double d = Double.valueOf(stack.pop());
+
+        return d % 1 == 0 ? String.valueOf(d.intValue()) : String.valueOf(d);
+    }
+
+    private int comparePrecedence(String op1, String op2) {
+        if ((op1.equals("+") || op1.equals("-")) && (op2.equals("*") || op2.equals("/")))
+            return -1;
+
+        if ((op1.equals("*") || op1.equals("/")) && (op2.equals("+") || op2.equals("-")))
+            return 1;
+
+        return 0;
+    }
+
+    private boolean isOperator(String s) {
+        return OPERATORS.contains(s);
+    }
+
+    private boolean isDigit(String s) {
+        return DIGITS.contains(s);
+    }
+
+    private boolean isSeparator(String s) {
+        return SEPARATOR.equals(s);
+    }
+
+    private boolean isLeftBracket(String s) {
+        return LEFT_BRACKET.equals(s);
+    }
+
+    private boolean isRightBracket(String s) {
+        return RIGHT_BRACKET.equals(s);
+    }
+
+    private boolean isValidStatement(String statement) {
+        if (statement == null)
+            return false;
+
+        statement = statement.replaceAll("\\s","");
+
+        int len = statement.length();
+
+        if (len == 0)
+            return false;
+
+        if (isOperator("" + statement.charAt(0)) || isSeparator("" + statement.charAt(0)))
+            return false;
+
+        if (isOperator("" + statement.charAt(len - 1)) || isSeparator("" + statement.charAt(len - 1)))
+            return false;
+
+        int openBracketsCount = 0;
+        for(int i = 0; i < len; ++i) {
+            switch (statement.charAt(i)) {
+                case '(':
+                    ++openBracketsCount;
+                    break;
+                case ')':
+                    if (openBracketsCount > 0)
+                        --openBracketsCount;
+                    else
+                        return false;
+                    break;
+                case '+':
+                case '-':
+                case '*':
+                case '/':
+                    if (isOperator("" + statement.charAt(i - 1)) || isLeftBracket("" + statement.charAt(i - 1))
+                            || isSeparator("" + statement.charAt(i - 1)))
+                        return false;
+
+                    if (isOperator("" + statement.charAt(i + 1)) || isRightBracket("" + statement.charAt(i + 1))
+                            || isSeparator("" + statement.charAt(i + 1)))
+                        return false;
+                    break;
+                case '.':
+                    if (!isDigit("" + statement.charAt(i - 1)))
+                        return false;
+
+                    if (!isDigit("" + statement.charAt(i + 1)))
+                        return false;
+                    break;
+                default:
+                    if (isDigit("" + statement.charAt(i)))
+                        break;
+
+                    return false;
+            }
+        }
+        return openBracketsCount == 0;
     }
 }
